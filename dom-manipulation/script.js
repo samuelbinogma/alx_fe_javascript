@@ -368,7 +368,7 @@ async function syncQuotes() {
 
         saveQuotes();
         populateCategories();
-        showNotification('Data synced with server.');
+        showNotification('Quotes synced with server!.');
     } catch (e) {
         console.error('Sync failed:', e);
         showNotification('Failed to sync with server.');
