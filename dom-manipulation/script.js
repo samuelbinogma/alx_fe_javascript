@@ -251,18 +251,42 @@ function exportToJsonFile() {
     URL.revokeObjectURL(url);
 }
 
-function importFromJsonFile(event) {
+async function importFromJsonFile(event) {
     const fileReader = new FileReader();
-    fileReader.onload = function(event) {
+    fileReader.onload = async function(event) {
         try {
             const importedQuotes = JSON.parse(event.target.result);
-            // Validate that imported data is an array of objects with text and category
             if (Array.isArray(importedQuotes) && importedQuotes.every(q => q.text && q.category)) {
+                // Post imported quotes without id to server
+                for (let quote of importedQuotes) {
+                    if (!quote.id) {
+                        try {
+                            const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    title: quote.category,
+                                    body: quote.text,
+                                    userId: 1
+                                }),
+                                headers: {
+                                    'Content-Type': 'application/json; charset=UTF-8'
+                                }
+                            });
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! Status: ${response.status}`);
+                            }
+                            const data = await response.json();
+                            quote.id = data.id;
+                        } catch (e) {
+                            console.error('Failed to post imported quote to server:', e);
+                        }
+                    }
+                }
                 quotes.push(...importedQuotes);
                 saveQuotes();
-                updateCategoryDropdown();
+                populateCategories();
                 showRandomQuote();
-                alert('Quotes imported successfully!');
+                showNotification('Quotes imported successfully' + (importedQuotes.some(q => q.id) ? ' and synced with server.' : '.'));
             } else {
                 alert('Invalid JSON format. Please ensure the file contains an array of quotes with text and category.');
             }
@@ -271,7 +295,7 @@ function importFromJsonFile(event) {
         }
     };
     fileReader.readAsText(event.target.files[0]);
-}  
+}
 
 async function fetchQuotesFromServer() {
     try {
@@ -287,14 +311,12 @@ async function fetchQuotesFromServer() {
 
 async function syncWithServer() {
     try {
-        const response = await fetch('https://jsonplaceholder.typicode.com/posts');
-        const serverData = await response.json();
-        const serverQuotes = serverData.map(s => ({ id: s.id, text: s.body, category: s.title }));
-
+        const serverQuotes = await fetchQuotesFromServer();
+        
         // Post local quotes without id to server
         for (let i = 0; i < quotes.length; i++) {
             if (!quotes[i].id) {
-                try { 
+                try {
                     const postResponse = await fetch('https://jsonplaceholder.typicode.com/posts', {
                         method: 'POST',
                         body: JSON.stringify({
@@ -303,13 +325,16 @@ async function syncWithServer() {
                             userId: 1
                         }),
                         headers: {
-                            'Content-type': 'application/json; charset=UTF-8'
+                            'Content-Type': 'application/json; charset=UTF-8'
                         }
                     });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${postResponse.status}`);
+                    }
                     const data = await postResponse.json();
                     quotes[i].id = data.id;
                 } catch (e) {
-                    console.log('Failed to post to server')
+                    console.error('Failed to post to server:', e);
                 }
             }
         }
