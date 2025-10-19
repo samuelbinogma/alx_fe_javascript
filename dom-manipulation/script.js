@@ -136,11 +136,31 @@ function addQuote() {
         document.getElementById('newQuoteCategory').value = '';
         
         // Update dropdown and show new quote
+        populateCategories();
         updateCategoryDropdown();
         showRandomQuote();
     } else {
         alert('Please enter both a quote and category');
     }
+}
+
+function populateCategories() {
+    const categorySelect = document.getElementById('categoryFilter');
+    categorySelect.innerHTML = '<option value="all">All Categories</option>';
+    
+    // Get unique categories
+    const categories = [...new Set(quotes.map(quote => quote.category))];
+    
+    // Add categories to dropdown
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+    });
+    
+    // Restore last selected category
+    loadLastCategory();
 }
 
 function updateCategoryDropdown() {
