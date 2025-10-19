@@ -273,6 +273,18 @@ function importFromJsonFile(event) {
     fileReader.readAsText(event.target.files[0]);
 }  
 
+async function fetchQuotesFromServer() {
+    try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/posts');
+        const serverData = await response.json();
+        return serverData.map(s => ({ id: s.id, text: s.body, category: s.title }));
+    } catch (e) {
+        console.error('Failed to fetch quotes from server:', e);
+        showNotification('Failed to fetch quotes from server.');
+        return [];
+    }
+}
+
 async function syncWithServer() {
     try {
         const response = await fetch('https://jsonplaceholder.typicode.com/posts');
@@ -282,19 +294,23 @@ async function syncWithServer() {
         // Post local quotes without id to server
         for (let i = 0; i < quotes.length; i++) {
             if (!quotes[i].id) {
-                const postResponse = await fetch('https://jsonplaceholder.typicode.com/posts', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        title: quotes[i].category,
-                        body: quotes[i].text,
-                        userId: 1
-                    }),
-                    headers: {
-                        'Content-type': 'application/json; charset=UTF-8'
-                    }
-                });
-                const data = await postResponse.json();
-                quotes[i].id = data.id;
+                try { 
+                    const postResponse = await fetch('https://jsonplaceholder.typicode.com/posts', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            title: quotes[i].category,
+                            body: quotes[i].text,
+                            userId: 1
+                        }),
+                        headers: {
+                            'Content-type': 'application/json; charset=UTF-8'
+                        }
+                    });
+                    const data = await postResponse.json();
+                    quotes[i].id = data.id;
+                } catch (e) {
+                    console.log('Failed to post to server')
+                }
             }
         }
 
@@ -303,6 +319,7 @@ async function syncWithServer() {
 
         let conflicts = [];
 
+        // Merge server quotes
         for (const s of serverQuotes) {
             const local = localMap.get(s.id);
             if (local) {
