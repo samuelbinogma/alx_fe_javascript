@@ -41,6 +41,10 @@ function showRandomQuote() {
     const randomIndex = Math.floor(Math.random() * quotes.length);
     const quote = quotes[randomIndex];
 
+    // Save last viewed quote to session storage
+    sessionStorage.setItem('lastQuote', JSON.stringify(quote));
+    
+
     // Clear previous content
     quoteDisplay.innerHTML = '';
 
@@ -123,12 +127,33 @@ function createAddQuoteForm() {
     updateCategoryDropdown();
 }
 
-function addQuote() {
+async function addQuote() {
     const quoteText = document.getElementById('newQuoteText').value;
     const category = document.getElementById('newQuoteCategory').value;
     
     if (quoteText && category) {
-        quotes.push({ text: quoteText, category: category });
+        let newQuote = { text: quoteText, category: category };
+
+        try {
+            const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: category,
+                    body: quoteText,
+                    userId: 1
+                }),
+                headers: {
+                    'content-type': 'application/json; charset=UTF-8'
+                }
+            });
+            const data = await response.json;
+            newQuote.id = data.id;
+        } catch (e) {
+            console.error('Failed to psot to server:', e);
+            // Add without id if failed
+        }
+
+        quotes.push(newQuote);
         saveQuotes(); // Save to local storage
         
         // Clear inputs
@@ -248,6 +273,80 @@ function importFromJsonFile(event) {
     fileReader.readAsText(event.target.files[0]);
 }  
 
+async function syncWithServer() {
+    try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/posts');
+        const serverData = await response.json();
+        const serverQuotes = serverData.map(s => ({ id: s.id, text: s.body, category: s.title }));
+
+        // Post local quotes without id to server
+        for (let i = 0; i < quotes.length; i++) {
+            if (!quotes[i].id) {
+                const postResponse = await fetch('https://jsonplaceholder.typicode.com/posts', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: quotes[i].category,
+                        body: quotes[i].text,
+                        userId: 1
+                    }),
+                    headers: {
+                        'Content-type': 'application/json; charset=UTF-8'
+                    }
+                });
+                const data = await postResponse.json();
+                quotes[i].id = data.id;
+            }
+        }
+
+        // Create map of local quotes by id
+        const localMap = new Map(quotes.map(q => [q.id, q]));
+
+        let conflicts = [];
+
+        for (const s of serverQuotes) {
+            const local = localMap.get(s.id);
+            if (local) {
+                if (local.text !== s.text || local.category !== s.category) {
+                    conflicts.push({ id: s.id, local, server: s });
+                }
+            } else {
+                quotes.push(s);
+            }
+        }
+
+        // Handle conflicts
+        for (const c of conflicts) {
+            const useServer = confirm(`Conflict detected for quote ID ${c.id}:\nLocal: "${c.local.text}" - ${c.local.category}\nServer: "${c.server.text}" - ${c.server.category}\nClick OK to use server version, Cancel to keep local version.`);
+            if (useServer) {
+                c.local.text = c.server.text;
+                c.local.category = c.server.category;
+            }
+            showNotification(`Conflict resolved for quote ID ${c.id}.`);
+        }
+
+        saveQuotes();
+        populateCategories();
+        showNotification('Data synced with server.');
+    } catch (e) {
+        console.error('Sync failed:', e);
+        showNotification('Failed to sync with server.');
+    }
+}
+
+function showNotification(message) {
+    const notification = document.getElementById('notification');
+    if (notification) {
+        notification.textContent = message;
+        notification.style.display = 'block';
+        setTimeout(() => {
+            notification.style.display = 'none';
+            notification.textContent = '';
+        }, 5000);
+    } else {
+        alert(message);
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     createAddQuoteForm();
@@ -277,5 +376,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         showRandomQuote();
     }
+
+    // Initial sync with server
+    syncWithServer();
+
+    // Periodic sync every 60 seconds
+    setInterval(syncWithServer, 60000);
 });
 
