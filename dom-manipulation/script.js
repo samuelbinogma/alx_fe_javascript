@@ -20,6 +20,22 @@ function saveQuotes() {
     localStorage.setItem('quotes', JSON.stringify(quotes));
 }
 
+// Load last selected category from local storage
+function loadLastCategory() {
+    const lastCategory = localStorage.getItem('lastCategory');
+    const categorySelect = document.getElementById('categoryFilter');
+    if (lastCategory && categorySelect.querySelector(`option[value="${lastCategory}"]`)) {
+        categorySelect.value = lastCategory;
+        filterQuotes();
+    }
+}
+
+// Save last selected category to local storage
+function saveLastCategory(category) {
+    localStorage.setItem('lastCategory', category);
+}
+
+
 function showRandomQuote() {
     const quoteDisplay = document.getElementById('quoteDisplay');
     const randomIndex = Math.floor(Math.random() * quotes.length);
