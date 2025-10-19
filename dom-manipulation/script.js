@@ -309,7 +309,7 @@ async function fetchQuotesFromServer() {
     }
 }
 
-async function syncWithServer() {
+async function syncQuotes() {
     try {
         const serverQuotes = await fetchQuotesFromServer();
         
@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial sync with server
-    syncWithServer();
+    syncQuotes();
 
     // Periodic sync every 60 seconds
     setInterval(syncWithServer, 60000);
